@@ -1,0 +1,2 @@
+source A:/eps32project/Siggy-esp32c3/build/bootloader/gdbinit/symbols
+source A:/eps32project/Siggy-esp32c3/build/bootloader/gdbinit/connect
