@@ -76,6 +76,7 @@ SSD1306_t dev;
 void process_data(uint8_t *data, int len); // 处理数据函数声明
 void send_id(uint8_t *rnd_in); // 用来发送ID的
 static inline void secure_zero(void *p, size_t n); // 安全清零函数声明
+void error(void); // 错误显示函数
 
 void app_main(void)
 {
@@ -131,6 +132,11 @@ void app_main(void)
 
     // }
     // HMAC读取区-结束（测试用）
+
+    // 功能测试区-开始
+    
+    // 功能测试区-结束
+
     vTaskDelay(50);
     // 发送命令0，告诉“veri”：“siggy”已经准备好了
     uart_write_bytes(UART_PORT_NUM, READY_PACKET, 3);
@@ -215,7 +221,7 @@ void send_id(uint8_t *rnd_in)
             // 签名成功，点亮绿色LED
             ssd1306_display_text(&dev, 5, "Sig OK!", 7, false);
             gpio_set_level(LED_GREEN_GPIO, 0); // 点亮绿色LED
-            vTaskDelay(pdMS_TO_TICKS(1000));   // 延时1秒
+            vTaskDelay(pdMS_TO_TICKS(100));   // 延时
             gpio_set_level(LED_GREEN_GPIO, 1); // 熄灭绿色LED
             ssd1306_display_text(&dev, 5, "       ", 7, false);
             error_count = 0; // 成功一次，错误计数器归零
@@ -223,21 +229,7 @@ void send_id(uint8_t *rnd_in)
     } else {
         error_count++;
         if (error_count >= 2) {
-            ssd1306_display_text(&dev, 0, "Admin key-ERROR", 15, true);
-            ssd1306_display_text(&dev, 5, "================", 16, true);
-            ssd1306_display_text(&dev, 6, "L O C K D O W N", 15, true);
-            ssd1306_display_text(&dev, 7, "================", 16, true);
-            gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
-            while(1) {
-                vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
-                ssd1306_display_text(&dev, 5, "                ", 16, false);
-                ssd1306_display_text(&dev, 6, "                ", 16, false);
-                ssd1306_display_text(&dev, 7, "                ", 16, false);
-                vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
-                ssd1306_display_text(&dev, 5, "================", 16, true);
-                ssd1306_display_text(&dev, 6, "L O C K D O W N", 15, true);
-                ssd1306_display_text(&dev, 7, "================", 16, true);
-            }
+            error();// 进入错误显示
         } else {
             ssd1306_display_text(&dev, 5, "HMAC ERROR", 10, false);
             gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
@@ -253,4 +245,22 @@ void send_id(uint8_t *rnd_in)
 static inline void secure_zero(void *p, size_t n) {
     volatile uint8_t *vp = (volatile uint8_t *)p;
     while (n--) *vp++ = 0;
+}
+
+void error(void) {
+    ssd1306_display_text(&dev, 0, "Admin key-ERROR", 15, true);
+    ssd1306_display_text(&dev, 5, "================", 16, true);
+    ssd1306_display_text(&dev, 6, "L O C K D O W N ", 16, true);
+    ssd1306_display_text(&dev, 7, "================", 16, true);
+    gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
+    while(1) {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
+        ssd1306_display_text(&dev, 5, "                ", 16, false);
+        ssd1306_display_text(&dev, 6, "                ", 16, false);
+        ssd1306_display_text(&dev, 7, "                ", 16, false);
+        vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
+        ssd1306_display_text(&dev, 5, "================", 16, true);
+        ssd1306_display_text(&dev, 6, "L O C K D O W N ", 16, true);
+        ssd1306_display_text(&dev, 7, "================", 16, true);
+    }
 }

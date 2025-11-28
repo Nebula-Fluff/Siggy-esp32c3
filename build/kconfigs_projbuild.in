@@ -1,6 +1,0 @@
-source "C:/Users/lipo_/esp/v5.5.1/esp-idf/components/bootloader/Kconfig.projbuild"
-source "C:/Users/lipo_/esp/v5.5.1/esp-idf/components/esp_app_format/Kconfig.projbuild"
-source "C:/Users/lipo_/esp/v5.5.1/esp-idf/components/esp_rom/Kconfig.projbuild"
-source "C:/Users/lipo_/esp/v5.5.1/esp-idf/components/esptool_py/Kconfig.projbuild"
-source "C:/Users/lipo_/esp/v5.5.1/esp-idf/components/partition_table/Kconfig.projbuild"
-source "A:/eps32project/Siggy-esp32c3/components/ssd1306/Kconfig.projbuild"
