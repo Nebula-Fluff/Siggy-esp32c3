@@ -1,3 +1,5 @@
+#在 keytool/HMACkeyToEdKeyPair.py 存在的情况下运行，将自动计算 Ed25519 公钥。
+# 请确保已正确配置 HMAC Key 文件路径和种子信息。
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import NoEncryption 

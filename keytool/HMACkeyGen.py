@@ -1,3 +1,4 @@
+# 直接运行，会在相对路径 'keytool/key/hmac_key.bin' 生成一个 32 字节的 HMAC 密钥文件。
 import os
 
 # 密钥将放在当前脚本所在目录下的 'config' 子目录中
