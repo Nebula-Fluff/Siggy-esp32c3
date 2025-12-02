@@ -30,20 +30,20 @@
 #include "tweetnacl.h"
 #include "ssd1306.h"
 
-
-#define UART_PORT_NUM UART_NUM_1 // 串口号，发布时改为非0串口
+#define UART_PORT_NUM UART_NUM_0 // 串口号，发布时改为非0串口
 #define UART_BAUD_RATE 115200
-#define UART_TX_PIN 0 // TX引脚-v A1.0 PCB为4号引脚，v1.0为0，usb串口测试时为21
-#define UART_RX_PIN 1 // RX引脚-v A1.0 PCB为5号引脚，v1.0为1，usb串口测试时为20
+#define UART_TX_PIN 21 // TX引脚-v A1.0 PCB为4号引脚，v1.0为0，usb串口测试时为21
+#define UART_RX_PIN 20 // RX引脚-v A1.0 PCB为5号引脚，v1.0为1，usb串口测试时为20
 
 #define SCL_PIN 5 // SCL引脚-version A1.0 PCB为5号引脚
 #define SDA_PIN 4 // SDA引脚-version A1.0 PCB为4号引脚
 
 #define BUF_SIZE 256           // 串口缓冲区大小
 #define SEND_PACKET_LEN 105    // 发送数据包长度
+#define SEND_PACKET_LEN_PK 35  // 发送公钥数据包长度
 #define RX_PACKET_LEN 35       // 接收数据包长度
 #define HEADER_LEN 2           // 包头长度
-#define RX_PACKET_DATA_LEN 33     // 数据包数据部分长度
+#define RX_PACKET_DATA_LEN 33  // 数据包数据部分长度
 #define ID_LEN 5               // ID数据长度
 #define TO_SIGN_ID_PART_LEN 38 // 需签名ID部分长度，控制位1字节+随机数32字节+ID5字节
 #define SIGNED_ID_PART_LEN 102 // 签名后ID部分长度，签名64字节+签名前数据，ID部分共38字节
@@ -55,15 +55,17 @@
 #define LED_GREEN_GPIO 19 // 积极态LED引脚-version A1.0 PCB为19号引脚
 #define LED_RED_GPIO 18   // 消极态LED引脚-version A1.0 PCB为18号引脚
 
-const uint8_t PACKET_HEADER[HEADER_LEN] = {0xA5, 0x5A};      // 包头内容
-const uint8_t COMMAND0[1] = {0x00};                          // 命令0-用来告诉“veri”：“siggy”已经准备好了
-const uint8_t COMMAND1[1] = {0x01};                          // 命令1-用来判断“veri”是不是在要“siggy”的ID，这条消息也自带签名挑战
-const uint8_t COMMAND1_0[1] = {0x10};                        // 命令10-用来告诉“veri”：这条消息里是“siggy”的ID，并且回应了签名挑战
-const uint8_t DEVICE_ID[5] = {0xFF, 0x00, 0x00, 0x00, 0x01}; // 设备ID
+const uint8_t PACKET_HEADER[HEADER_LEN] = {0xA5, 0x5A};                                                                                                                                                                              // 包头内容
+const uint8_t COMMAND0[1] = {0x00};                                                                                                                                                                                                  // 命令0-用来告诉“veri”：“siggy”已经准备好了
+const uint8_t COMMAND1[1] = {0x01};                                                                                                                                                                                                  // 命令1-用来判断“veri”是不是在要“siggy”的ID，这条消息也自带签名挑战
+const uint8_t COMMAND2[1] = {0x02};                                                                                                                                                                                                  // 命令2-判断“veri”是不是在要本“siggy”的公钥
+const uint8_t COMMAND1_0[1] = {0x10};                                                                                                                                                                                                // 命令10-用来告诉“veri”：这条消息里是“siggy”的ID，并且回应了签名挑战
+const uint8_t COMMAND1_1[1] = {0x11};                                                                                                                                                                                                // 命令11-用来告诉“veri”：这条消息里是“siggy”的公钥
+const uint8_t DEVICE_ID[5] = {0xFF, 0x00, 0x00, 0x00, 0x01};                                                                                                                                                                         // 设备ID
 const uint8_t pk[PUBLIC_KEY_LEN] = {0xF9, 0xBF, 0xC4, 0xFC, 0x54, 0x93, 0xC4, 0xE2, 0x59, 0xDB, 0xDF, 0xE6, 0x65, 0x79, 0x72, 0x00, 0x80, 0x44, 0x1E, 0x04, 0x2E, 0xF0, 0x92, 0xEA, 0x53, 0xA6, 0x01, 0x4E, 0x78, 0xD2, 0xE2, 0xAA}; // 公钥存储部分
 
 const char *seed_sk = "Siggy-1-SEED-NebulaFluff"; // 私钥种子
-const size_t seed_sk_len = 25; // 私钥种子长度
+const size_t seed_sk_len = 25;                    // 私钥种子长度
 
 const uint8_t READY_PACKET[3] = {0xA5, 0x5A, 0x00};
 
@@ -73,10 +75,10 @@ int error_count = 0; // 错误计数器
 SSD1306_t dev;
 
 // 函数声明
-void process_data(uint8_t *data, int len); // 处理数据函数声明
-void send_id(uint8_t *rnd_in); // 用来发送ID的
+void process_data(uint8_t *data, int len);         // 处理数据函数声明
+void send_id(uint8_t *rnd_in);                     // 用来发送ID的
 static inline void secure_zero(void *p, size_t n); // 安全清零函数声明
-void error(void); // 错误显示函数
+void error(void);                                  // 错误显示函数
 
 void app_main(void)
 {
@@ -118,7 +120,7 @@ void app_main(void)
     ssd1306_display_text(&dev, 1, "Siggy-V1.0", 10, false);
     ssd1306_display_text(&dev, 2, "By NebulaFluff", 12, false);
     ssd1306_display_text(&dev, 3, "KeyID:FF00000001", 16, false);
-    
+
     // HMAC读取区-开始（测试用）
     // uint8_t hmac[32];
 
@@ -134,7 +136,7 @@ void app_main(void)
     // HMAC读取区-结束（测试用）
 
     // 功能测试区-开始
-    
+
     // 功能测试区-结束
 
     vTaskDelay(50);
@@ -144,7 +146,7 @@ void app_main(void)
     while (1)
     {
         int received = uart_read_bytes(UART_PORT_NUM, rx_buf, RX_PACKET_LEN, pdMS_TO_TICKS(500)); // 读取数据，超时500ms
-        if (received == RX_PACKET_LEN && memcmp(rx_buf, PACKET_HEADER, 2) == 0)
+        if (received >= HEADER_LEN && memcmp(rx_buf, PACKET_HEADER, 2) == 0)
         {
             process_data(rx_buf + 2, RX_PACKET_DATA_LEN); // 去掉包头，处理数据
         }
@@ -153,20 +155,30 @@ void app_main(void)
             continue; // 没有数据，继续等待
         }
         else
-        {   //暂时啥也不做
-            // gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
-            // vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
-            // gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
+        { // 暂时啥也不做
+          //  gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
+          //  vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
+          //  gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
         }
     }
 }
 
 void process_data(uint8_t *data, int len)
 {
-    static uint8_t RXRND[RND_LEN];
-    memcpy(RXRND, data + sizeof(COMMAND1), RND_LEN); // 将数据包内随机数部分挪到随机数缓存区
-    if (data[0] == COMMAND1[0])
+    if (data[0] == COMMAND2[0])
     {
+        // 处理命令11-发公钥给“veri”
+        static uint8_t to_send_packet_pk[SEND_PACKET_LEN_PK];                            // 要发送的数据包
+        memcpy(to_send_packet_pk, PACKET_HEADER, HEADER_LEN);                            // 装入包头
+        memcpy(to_send_packet_pk + HEADER_LEN, COMMAND1_1, sizeof(COMMAND1_1));          // 装入命令
+        memcpy(to_send_packet_pk + HEADER_LEN + sizeof(COMMAND1_1), pk, PUBLIC_KEY_LEN); // 装入公钥数据
+        // 发送数据包
+        uart_write_bytes(UART_PORT_NUM, to_send_packet_pk, SEND_PACKET_LEN_PK);
+    }
+    else if (data[0] == COMMAND1[0])
+    {
+        static uint8_t RXRND[RND_LEN];
+        memcpy(RXRND, data + sizeof(COMMAND1), RND_LEN); // 将数据包内随机数部分挪到随机数缓存区
         // 处理命令1-发ID给“veri”
         send_id(RXRND);
     }
@@ -175,11 +187,11 @@ void process_data(uint8_t *data, int len)
         // 未知命令
         ssd1306_display_text(&dev, 5, "error", 5, false);
         gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
-        vTaskDelay(pdMS_TO_TICKS(500)); // 延时
+        vTaskDelay(pdMS_TO_TICKS(500));  // 延时
         gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
-        vTaskDelay(pdMS_TO_TICKS(100)); // 延时
+        vTaskDelay(pdMS_TO_TICKS(100));  // 延时
         gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
-        vTaskDelay(pdMS_TO_TICKS(500)); // 延时
+        vTaskDelay(pdMS_TO_TICKS(500));  // 延时
         gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
         ssd1306_display_text(&dev, 5, "     ", 5, false);
     }
@@ -190,8 +202,8 @@ void send_id(uint8_t *rnd_in)
     static uint8_t to_sign_data[TO_SIGN_ID_PART_LEN]; // 需签名数据部分
     static uint8_t signed_data[SIGNED_ID_PART_LEN];   // 签名数据部分
     static uint8_t to_send_packet[SEND_PACKET_LEN];   // 要发送的数据包
-    unsigned long long sign_out_len;           // 存毫无用处的签名输出信息的长度信息
-    static uint8_t key_pair[KEY_PAIR_LEN]; // 私钥存储部分
+    unsigned long long sign_out_len;                  // 存毫无用处的签名输出信息的长度信息
+    static uint8_t key_pair[KEY_PAIR_LEN];            // 私钥存储部分
     // 组合包数据部分
     memcpy(to_sign_data, COMMAND1_0, sizeof(COMMAND1_0));
     memcpy(to_sign_data + sizeof(COMMAND1_0), rnd_in, RND_LEN);             // 随机数
@@ -199,10 +211,12 @@ void send_id(uint8_t *rnd_in)
 
     // 签名数据部分
     esp_err_t result = esp_hmac_calculate(HMAC_KEY4, seed_sk, seed_sk_len, key_pair); // 计算HMAC，得到私钥并放入key_pair
-    memcpy(key_pair + 32, pk, PUBLIC_KEY_LEN); // 将公钥复制到密钥对后32字节
+    memcpy(key_pair + 32, pk, PUBLIC_KEY_LEN);                                        // 将公钥复制到密钥对后32字节
 
-    if (result == ESP_OK) {
-        if (crypto_sign(signed_data, &sign_out_len, to_sign_data, (unsigned long long)sizeof(to_sign_data), key_pair) != 0) {
+    if (result == ESP_OK)
+    {
+        if (crypto_sign(signed_data, &sign_out_len, to_sign_data, (unsigned long long)sizeof(to_sign_data), key_pair) != 0)
+        {
             // 签名完成后
             secure_zero(key_pair, KEY_PAIR_LEN); // 清除密钥对缓存，防止泄露
             // 签名失败，点亮红色LED
@@ -211,49 +225,58 @@ void send_id(uint8_t *rnd_in)
             vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
             gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
             ssd1306_display_text(&dev, 5, "         ", 9, false);
-        } else {
-            secure_zero(key_pair, KEY_PAIR_LEN); // 清除密钥对缓存，防止泄露
-            memcpy(to_send_packet, PACKET_HEADER, HEADER_LEN);                                                // 装入包头
-            memcpy(to_send_packet + HEADER_LEN, COMMAND1_0, sizeof(COMMAND1_0));                              // 装入命令
-            memcpy(to_send_packet + HEADER_LEN + sizeof(COMMAND1_0), signed_data, SIGNED_ID_PART_LEN);        // 装入签名数据
+        }
+        else
+        {
+            secure_zero(key_pair, KEY_PAIR_LEN);                                                       // 清除密钥对缓存，防止泄露
+            memcpy(to_send_packet, PACKET_HEADER, HEADER_LEN);                                         // 装入包头
+            memcpy(to_send_packet + HEADER_LEN, COMMAND1_0, sizeof(COMMAND1_0));                       // 装入命令
+            memcpy(to_send_packet + HEADER_LEN + sizeof(COMMAND1_0), signed_data, SIGNED_ID_PART_LEN); // 装入签名数据
             // 发送数据包
             uart_write_bytes(UART_PORT_NUM, to_send_packet, SEND_PACKET_LEN);
             // 签名成功，点亮绿色LED
             ssd1306_display_text(&dev, 5, "Sig OK!", 7, false);
             gpio_set_level(LED_GREEN_GPIO, 0); // 点亮绿色LED
-            vTaskDelay(pdMS_TO_TICKS(100));   // 延时
+            vTaskDelay(pdMS_TO_TICKS(100));    // 延时
             gpio_set_level(LED_GREEN_GPIO, 1); // 熄灭绿色LED
             ssd1306_display_text(&dev, 5, "       ", 7, false);
             error_count = 0; // 成功一次，错误计数器归零
         }
-    } else {
+    }
+    else
+    {
         error_count++;
-        if (error_count >= 2) {
-            error();// 进入错误显示
-        } else {
+        if (error_count >= 2)
+        {
+            error(); // 进入错误显示
+        }
+        else
+        {
             ssd1306_display_text(&dev, 5, "HMAC ERROR", 10, false);
             gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
             vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
             gpio_set_level(LED_RED_GPIO, 1); // 熄灭红色LED
             ssd1306_display_text(&dev, 5, "         ", 9, false);
         }
-     
     }
-    
 }
 
-static inline void secure_zero(void *p, size_t n) {
+static inline void secure_zero(void *p, size_t n)
+{
     volatile uint8_t *vp = (volatile uint8_t *)p;
-    while (n--) *vp++ = 0;
+    while (n--)
+        *vp++ = 0;
 }
 
-void error(void) {
+void error(void)
+{
     ssd1306_display_text(&dev, 0, "Admin key-ERROR", 15, true);
     ssd1306_display_text(&dev, 5, "================", 16, true);
     ssd1306_display_text(&dev, 6, "L O C K D O W N ", 16, true);
     ssd1306_display_text(&dev, 7, "================", 16, true);
     gpio_set_level(LED_RED_GPIO, 0); // 点亮红色LED
-    while(1) {
+    while (1)
+    {
         vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1秒
         ssd1306_display_text(&dev, 5, "                ", 16, false);
         ssd1306_display_text(&dev, 6, "                ", 16, false);
